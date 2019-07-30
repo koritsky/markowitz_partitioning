@@ -12,12 +12,12 @@ g_dim = sum(block_dim)
 print("Given random block matrix:")
 print(np.around(matrix, after_comma))
 print("\n")
-"""
-We define here (according to the letter) permutation matrix p_matrix as one 
-that have 1 on (i, j) if Permutation(i) = j.
-So for column permutation of matrix A we should multiply  AP. For rows (P.T)A.
-Hence (P.T)AP is matrix A with permuted columns and rows.
-"""
+
+
+# We define here (according to the letter) permutation matrix p_matrix as one
+# that have 1 on (i, j) if Permutation(i) = j.
+# So for column permutation of matrix A we should multiply  AP. For rows (P.T)A.
+# Hence (P.T)AP is matrix A with permuted columns and rows.
 
 
 # Generate random permutation matrix
