@@ -1,70 +1,53 @@
-import dimod
-from utilits import *
+import utilits
+import solver
+import decomposer
+import composer
+from Koritskiy_Markowitz import Portfolio
+import numpy as np
 
 # Choose number of digits after comma in console printout
 after_comma = 3
+block_dim = [1, 3]
+np.random.seed(6)
 
+# Generate random covariance matrix (here is called "mixed_matrix"), prices and averages
+mixed_matrix = utilits.mixed_matrix_generator(block_dim)
+prices = np.random.rand(sum(block_dim))
+averages = np.random.rand(sum(block_dim))
 
-# Generate random symmetric block matrix
-block_dim = [3, 1]
-matrix = rand_sym_block_gen(block_dim)
-g_dim = sum(block_dim)
-print("Given random block matrix:")
-print(np.around(matrix, after_comma))
-print("\n")
+# Get solution_permutation matrix
+solution_permutation_matrix = solver.permutation_exact_solver(mixed_matrix)
 
+bqm = utilits.partitioning_qubo_build(mixed_matrix)
 
-# We define here (according to the letter) permutation matrix p_matrix as one
-# that have 1 on (i, j) if Permutation(i) = j.
-# So for column permutation of matrix A we should multiply  AP. For rows (P.T)A.
-# Hence (P.T)AP is matrix A with permuted columns and rows.
-
-
-# Generate random permutation matrix
-p_matrix = np.random.permutation(np.eye(g_dim))
-print("Random permutation matrix:")
-print(p_matrix)
-print("\n")
-
-# Mix generated matrix via permutation.
-mixed_matrix = np.dot(p_matrix.T, np.dot(matrix, p_matrix))
-print("Mixed matrix")
-print(np.around(mixed_matrix, after_comma))
-print("\n")
-
-# Create binary quadratic model, that will find best permutation to return out mixed_matrix block structure
-qubo_matrix = qubo_build(mixed_matrix, theta=10)
-bqm = dimod.BinaryQuadraticModel.from_numpy_matrix(qubo_matrix, offset=2*g_dim)
-
-# Get solution by brute force
-response = dimod.ExactSolver().sample(bqm)
-solution = [int((i+1)/2) for i in response.first[0].values()]
-solution_permutation_matrix = np.asarray(solution).reshape((g_dim, g_dim))
-print("Solution permutation matrix")
+# Check, whether solution matrix is permutation one
+if not utilits.permutation_check(solution_permutation_matrix):
+    print('\033[93m' + "Solution is not permutation matrix" + '\033[0m')
 print(solution_permutation_matrix)
-print("\n")
 
-# Check, whether solution matrix is permutation one.
-if not permutation_check(solution_permutation_matrix):
-    print("Solution is not permutation matrix")
+# Get decomposed matrices as a list of tuples (price, averages, covariance)
+decomposed_matrices = decomposer.permutation_decomposer(mixed_matrix=mixed_matrix,
+                                                        averages=averages,
+                                                        prices=prices,
+                                                        permutation_matrix=solution_permutation_matrix,
+                                                        max_dim=(max(block_dim)+1))
+# Get a list of solutions for decomposed matrices
+solutions = solver.dwave_solver(decomposed_matrices, num_reads=100)
 
-# Apply solution matrix to mixed and get the block one.
-new_matrix = np.dot(solution_permutation_matrix.T,
-                    np.dot(mixed_matrix,
-                           solution_permutation_matrix))
-print("New matrix")
-print(np.around(new_matrix, after_comma))
-print("\n")
+# Get a solution for original matrix
+original_solution = composer.solution_composer(solutions=solutions,
+                                               permutation_matrix=solution_permutation_matrix)
+print("Solution:")
+print(original_solution)
+print("---------------------------------")
 
-# Split new matrix into blocks with block dimension less then threshold
-print("Splitted matrices:")
-for i in split_until_threshold(new_matrix, threshold=8):
-    print(np.around(i, after_comma))
+# ---------------------------------
 
-
-
-
-
-
-
-
+# Now compare it with exact solution
+print("Now compare it with exact solution")
+portfolio = Portfolio(theta=[0.5, 0.5, 0],
+                      covariance=mixed_matrix,
+                      prices=prices,
+                      averages=averages)
+print("Exact solution:")
+print(portfolio.bruteforce()[1])
