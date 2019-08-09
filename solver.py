@@ -1,6 +1,7 @@
 from utilits import partitioning_qubo_build
 import dimod
 import numpy as np
+from hybrid.reference.kerberos import KerberosSampler
 from Koritskiy_Markowitz import Portfolio
 from cplex_solver import CplexSolver
 
@@ -48,5 +49,22 @@ def cplex_solver(mixed_matrix, theta=10):
                               api_key='api_642ddfbf-ae49-4947-84f1-196f6883eab2')
     qubo_solution = cplexsolver.find_opt()
     solution_permutation_matrix = np.array(qubo_solution).reshape((dim, dim))
+
+    return solution_permutation_matrix
+
+
+def kerberos_solver(mixed_matrix, max_iter=10, qpu_reads=100):
+    g_dim = mixed_matrix.shape[0]
+    qubo_matrix = partitioning_qubo_build(mixed_matrix)
+    bqm = dimod.BinaryQuadraticModel.from_numpy_matrix(qubo_matrix)
+    response = KerberosSampler().sample(bqm,
+                                        max_iter=max_iter,
+                                        convergence=3,
+                                        qpu_reads=qpu_reads)
+    solution = np.array([int(i) for i in response.first[0].values()])
+    solution_permutation_matrix = np.asarray(solution).reshape((g_dim, g_dim))
+    print("Solution permutation matrix")
+    print(solution_permutation_matrix)
+    print("\n")
 
     return solution_permutation_matrix

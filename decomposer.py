@@ -18,5 +18,5 @@ def permutation_decomposer(mixed_matrix, averages, prices, permutation_matrix, m
     cuts = [sum(dims[:i]) for i in range(len(dims) + 1)]
     decomposed_averages = np.array([averages[cuts[i]: cuts[i + 1]] for i in range(len(cuts) - 1)])
     decomposed_prices = np.array([prices[cuts[i]: cuts[i + 1]] for i in range(len(cuts) - 1)])
-    return list(zip(decomposed_prices, decomposed_averages, decomposed_matrices))
+    return list(zip(decomposed_prices, decomposed_averages, decomposed_matrices)), new_matrix
 

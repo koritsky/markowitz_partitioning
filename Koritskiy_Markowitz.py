@@ -1,8 +1,7 @@
 from __future__ import print_function
 import random
 import numpy as np
-from pyeasyga import pyeasyga
-
+from pyeasyga import pyeasyga_kor
 
 import networkx as nx
 import minorminer
@@ -75,7 +74,8 @@ class Portfolio:
         for row in range(n):
             qvector[row] = -1.0 * self.theta[0] * self.averages[row] - \
                            self.theta[2] * 2.0 * self.budget * self.prices[row] + \
-                           self.theta[1] * self.covariance[row][row] + self.theta[2] * self.prices[row] * self.prices[row]
+                           self.theta[1] * self.covariance[row][row] + self.theta[2] * self.prices[row] * self.prices[
+                               row]
 
         cfactor = self.theta[2] * self.budget * self.budget
 
@@ -90,7 +90,7 @@ class Portfolio:
             linear_offset += qvector[i]
 
         for row in range(n):
-            for col in range( row + 1, n, 1 ):
+            for col in range(row + 1, n, 1):
                 hvector[row] += 0.25 * qmatrix[row][col]
                 hvector[col] += 0.25 * qmatrix[row][col]
                 quadratic_offset += qmatrix[row][col]
@@ -99,7 +99,7 @@ class Portfolio:
         h = dict(zip(range(len(hvector)), hvector))
         J = {}
         for i in range(n):
-            for j in range(i+1, n):
+            for j in range(i + 1, n):
                 J[(i, j)] = Jmatrix[(i, j)]
         self.ising = (J, h, gfactor)
         return J, h, gfactor
@@ -131,15 +131,15 @@ class Portfolio:
                 best_result = result, individual
         return best_result
 
-    def genetic_algorithm(self, iteration_number=5, population_size=100, generations=50):
+    def genetic_algorithm(self, iteration_number=5, population_size=100, generations=50, init_solution=None):
         data = self.prices, self.averages, self.covariance, self.theta, self.budget
-        ga = pyeasyga.GeneticAlgorithm(data,
-                                       population_size=population_size,
-                                       generations=generations,
-                                       crossover_probability=0.8,
-                                       mutation_probability=0.05,
-                                       maximise_fitness=False,
-                                       elitism=True)
+        ga = pyeasyga_kor.GeneticAlgorithm(data,
+                                           population_size=population_size,
+                                           generations=generations,
+                                           crossover_probability=0.8,
+                                           mutation_probability=0.05,
+                                           maximise_fitness=False,
+                                           elitism=True)
 
         def create_individual(data):
             return [random.randint(0, 1) for _ in range(len(data[0]))]
@@ -155,6 +155,7 @@ class Portfolio:
 
         ga.fitness_function = fitness
         ga.create_individual = create_individual
+        ga.create_initial_population(initial_genes=init_solution)
         best_result = [None, []]
         for i in range(iteration_number):
             ga.run()
@@ -198,7 +199,6 @@ class Portfolio:
         portfolio_return = np.dot(solution, self.averages)
         portfolio_variance = np.dot(solution, np.dot(self.covariance, solution))
         return portfolio_return, portfolio_variance
-
 
 # if __name__ == "__main__":
 #     import dimod

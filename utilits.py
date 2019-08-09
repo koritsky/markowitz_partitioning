@@ -2,7 +2,7 @@ import numpy as np
 import itertools
 
 
-def partitioning_qubo_build(cov_matrix, theta=1):
+def partitioning_qubo_build(cov_matrix, theta=10):
     # Dimension of primary task
     n = cov_matrix.shape[0]
 
@@ -96,9 +96,10 @@ def split_until_threshold(matrix, threshold):
 
 
 def permutation_check(matrix):
+    mat = np.array(matrix)
     # Check, wheter given matrix is permutation one
 
-    return np.array_equal(np.dot(matrix, matrix.T), np.eye(matrix.shape[0]))
+    return np.array_equal(np.dot(mat, mat.T), np.eye(mat.shape[0]))
 
 
 def mixed_matrix_generator(block_dim: list):
@@ -131,7 +132,7 @@ def mixed_matrix_generator(block_dim: list):
 
 
 def to_permutation(permutation_matrix, bqm):
-    mat = permutation_matrix
+    mat = np.array(permutation_matrix)
     dim = mat.shape[0]
 
     row_holes = []
@@ -148,7 +149,8 @@ def to_permutation(permutation_matrix, bqm):
         print('\033[93m' + "Unable to fix this shit ¯\_(ツ)_/¯" + '\033[0m')
 
     sub_dim = len(row_holes)
-
+    print('\033[93m' + "Number of wrong lines:" + '\033[0m')
+    print('\033[93m' + str(sub_dim) + '\033[0m')
     solutions_energy = []
 
     permutations = [np.array(p) for p in itertools.permutations(np.eye(sub_dim))]
@@ -161,8 +163,7 @@ def to_permutation(permutation_matrix, bqm):
         for iter in mega_iters:
             hole_mat[iter[0]] = sub_mat[iter[1]]
         new_mat = mat + hole_mat
-        print(new_mat)
-        solutions_energy.append(bqm.energy(new_mat.shape(dim ** 2)))
+        solutions_energy.append(bqm.energy(new_mat.reshape(dim ** 2)))
 
     permutation_index = solutions_energy.index(min(solutions_energy))
 
