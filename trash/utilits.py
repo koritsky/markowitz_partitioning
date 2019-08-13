@@ -2,7 +2,7 @@ import numpy as np
 import itertools
 
 
-def partitioning_qubo_build(cov_matrix, theta=10):
+def to_partitioning_qubo(cov_matrix, theta=10):
     # Dimension of primary task
     n = cov_matrix.shape[0]
 
@@ -25,9 +25,6 @@ def partitioning_qubo_build(cov_matrix, theta=10):
     # Make it upper-diagonal
     qubo_matrix = qubo_matrix + np.triu(qubo_matrix, 1) - np.tril(qubo_matrix, -1)
     return qubo_matrix
-
-def to_energy(solution, qubo_matrix):
-    return np.dot(solution, np.dot(qubo_matrix, solution))
 
 
 def rand_sym_block_gen(block_dim: list):
@@ -151,6 +148,7 @@ def to_permutation(permutation_matrix, bqm):
     sub_dim = len(row_holes)
     print('\033[93m' + "Number of wrong lines:" + '\033[0m')
     print('\033[93m' + str(sub_dim) + '\033[0m')
+    assert sub_dim < 9, "Too many mistakes to fix it by bruteforce"
     solutions_energy = []
 
     permutations = [np.array(p) for p in itertools.permutations(np.eye(sub_dim))]

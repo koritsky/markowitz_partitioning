@@ -9,7 +9,7 @@ import numpy as np
 import xml.etree.ElementTree as ET
 
 import os
-import utilits
+from trash import utilits
 
 
 class CplexSolver:
@@ -159,7 +159,7 @@ if __name__ == "__main__":
     np.random.seed(0)
     dim = sum(block_dim)
     mixed_matrix = utilits.mixed_matrix_generator(block_dim)
-    qubo_matrix = utilits.partitioning_qubo_build(mixed_matrix)
+    qubo_matrix = utilits.to_partitioning_qubo(mixed_matrix)
     cplexsolver = CplexSolver(qubo_matrix=qubo_matrix,
                               url="https://api-oaas.docloud.ibmcloud.com/job_manager/rest/v1/",
                               api_key='api_642ddfbf-ae49-4947-84f1-196f6883eab2')
