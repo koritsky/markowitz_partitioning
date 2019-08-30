@@ -1,11 +1,8 @@
 import numpy as np
-import dimod
 
-from binary_problem import BinaryProblem
 from partitioning import Partitioning
 from markowitz import Portfolio
-import decomposer
-import composer
+from recomposers import Recomposers
 
 
 def main():
@@ -14,86 +11,111 @@ def main():
                         linewidth=170,  # Length of the line
                         suppress=True)  # Always fixed point notation
 
+    # %%
+
     # Fix seed to get non-random result
     # (Remove after debugging)
-    np.random.seed(5)
-
+    np.random.seed(9)
 
     # Block dimensions to generate
     block_dim = [3, 1]
     size = sum(block_dim)
 
-    # Create main object: portfolio instance:
-    portfolio = Portfolio(theta=[0.5, 0.5, 0])
+    # Generate random inputs for portfolio
+    averages = np.random.rand(size)
+    prices = np.random.rand(size)
+    theta = [0.5, 0.5, 0]
 
-    portfolio.averages = np.random.rand(size)
-    portfolio.prices = np.random.rand(size)
+    block_mat = Partitioning.rand_sym_block_gen(block_dim)
+    _, mixed_mat = Partitioning.mixed_matrix_generator(block_mat=block_mat)
+    covariance = mixed_mat
 
     # It also has to have covariance matrix. We assume that it is quazi-block.
-    # We want to find block. With out toy example we would create block matrix (with block_dim)
-    # Then we mix it and try to find proper permutation to return it block shape.
+    # We want to find blocks. With out toy example we would create block matrix (with block_dim)
+    # Then we mix it and try to find proper permutation to return it's block shape.
 
     # A whole problem of finding permutation requires new class object.
-    part = Partitioning(block_dim)
-    # Get solution_permutation matrix
+    part = Partitioning(mixed_mat)  # It was given block_dim, so block matrix structure was generated automatically
+
+    # Create main object: portfolio instance:
+    portfolio = Portfolio(theta=theta,
+                          averages=averages,
+                          prices=prices,
+                          covariance=covariance)
+
+    # %%
+
+    # Get solution_permutation matrix by exact solver
     _, solution = part.exact_solver()
-    solution_permutation_mat = part.list_to_mat(solution)
-    print(np.dot(solution_permutation_mat.T, np.dot(part.mixed_mat, solution_permutation_mat)))
+    part.permutation_mat = part.list_to_mat(solution)
+    print("Solution permutation matrix:")
+    print(part.permutation_mat)
+    print("\n")
+
 
     # Check, whether solution matrix is permutation one
-    #TODO: 1. Move it to partitioning, 2. Made it to use ga if lots of errors
-    if not part.permutation_check(solution_permutation_mat):
-        print('\033[93m' + "Solution is not permutation matrix" + '\033[0m')
-        # print('\033[93m' + "I'll try to fix it " + '\033[0m')
-        # qubo_matrix = part.to_partitioning_qubo(p.mixed_mat)
-        # bqm = dimod.BinaryQuadraticModel.from_numpy_matrix(qubo_matrix)
-        # new_solution_permutation_matrix = utilits.to_permutation(solution_permutation_matrix, bqm)
-        # if utilits.permutation_check(new_solution_permutation_matrix):
-        #     print('\033[93m' + "Success!" + '\033[0m')
-        #     print('\033[93m' + "New matrix is permutation" + '\033[0m')
-        #     solution_permutation_matrix = new_solution_permutation_matrix
-        # print("Solution matrix after fixing:")
-        # print(solution_permutation_matrix)
+    if not part.permutation_check(part.permutation_mat):
+        print('\033[93m' + "Solution is not permutation matrix" +
+              "Trying to fix it" + '\033[0m')
+        new_solution_permutation_mat = part.to_permutation(part.permutation_mat)
+        if part.permutation_check(new_solution_permutation_mat):
+            print('\033[93m' + "Success!" + '\033[0m')
+            part.permutation_mat = new_solution_permutation_mat
+        print("Solution matrix after fixing:")
+        print(part.permutation_mat)
 
-    # Get decomposed matrices as a list of tuples (price, averages, covariance)
-    decomposed_matrices, ordered_matrix = decomposer.permutation_decomposer(mixed_matrix=part.mixed_mat,
-                                                                            averages=portfolio.averages,
-                                                                            prices=portfolio.prices,
-                                                                            permutation_matrix=solution_permutation_mat,
-                                                                            max_dim=(max(block_dim) + 1))
-    # Get a list of solutions for decomposed matrices
-    solutions = binary_problem.dwave_solver(decomposed_matrices, num_reads=10)
+    part.ordered_mat = part.permute(part.permutation_mat, part.mixed_mat)
+    print("Ordered matrix:")
+    print(part.ordered_mat)
+    print("\n")
+    # %%
 
-    # Get a solution for original matrix
-    original_solution = composer.solution_composer(solutions=solutions,
-                                                   permutation_matrix=solution_permutation_matrix)
+    # Get a list of smaller portfolios which has covariance, prices and averages according to permutation
+    portfolios = Recomposers.permutation_decomposer(portfolio=portfolio,
+                                                    permutation_mat=part.permutation_mat,
+                                                    max_dim=(max(block_dim) + 1))
 
-    # # Genetic algorithm application:
-    # portfolio = Portfolio(prices=p.prices,
-    #                       averages=p.averages,
-    #                       covariance=ordered_matrix,
-    #                       theta=[0.5, 0.5, 0])
-    # # TODO: сделать топ n решений из dwave и засовывать их в ga как init_solution.
-    # # You can give it any iterable of good solutions, where ga would start from.
-    # ga_solution = portfolio.genetic_algorithm(init_solution=[original_solution], iteration_number=100)
-    #
-    # print("Original solution:")
-    # print(original_solution)
-    # print("GA solution:")
-    # print(ga_solution)
-    # print("---------------------------------")
+    # %%
+    # Here we get  several solutions
 
-    # ---------------------------------
+    # Solve each small portfolio task.
+    solutions = []
+    for port in portfolios:
+        _, small_solution = port.dwave_solver(num_reads=1)
+        solutions.append(small_solution)
 
-    # Now compare it with exact solution
-    print("Now compare it with exact solution")
-    portfolio = Portfolio(theta=[0.5, 0.5, 0],
-                          covariance=p.mixed_mat,
-                          prices=p.prices,
-                          averages=p.averages)
-    print("Exact solution:")
-    print(portfolio.bruteforce()[1])
+    # Apply permutation to concatenated solution to get the solution of the original portfolio
+    composed_solution = Recomposers.permutation_solution_composer(solutions, part.permutation_mat)
+    print("Solution with partitioning:")
+    print(portfolio.solution_energy(composed_solution), composed_solution)
+    print("\n")
 
 
+    ## Afterward genetic algorithm application ##
+    # TODO: сделать топ n решений из dwave и засовывать их в ga как init_solution.
+    # You can give it any iterable of good solutions, where ga would start from.
+
+    new_prices = np.dot(prices, part.permutation_mat)
+    new_averages = np.dot(averages, part.permutation_mat)
+
+    new_portfolio = Portfolio(prices=new_prices,
+                              averages=new_averages,
+                              covariance=part.ordered_mat,
+                              theta=theta)
+
+    ga_energy, ga_solution = new_portfolio.ga_solver(iteration_number=10,
+                                                     population_size=100,
+                                                     init_solution=[composed_solution])
+    ga_solution = np.dot(ga_solution,
+                         part.permutation_mat.T)  # part.permutation_mat.T is inversed to part.permutation_mat
+
+    print("GA solution:")
+    print(ga_energy, ga_solution)
+
+    # %%
+
+    # Now compare it with exact solution of the whole matrix
+    print("Now compare it with exact solution of the whole matrix")
+    print(portfolio.exact_solver())
 if __name__ == "__main__":
     main()

@@ -1,0 +1,5 @@
+This folder contains generated matrices for testing algorithms for finding best permutations.
+Each folder contains:
+	block_mat - block matrix with blocks of size of the name of folder. For example: 223 means matrix of size 7x7 with blocks of size 2x2, 3x3 and 3x3.
+	mix_permutation_mat - matrix of permutation, that was generated randomly. 
+	mixed_mat - matrix after application of mix_permutation_mat. 
