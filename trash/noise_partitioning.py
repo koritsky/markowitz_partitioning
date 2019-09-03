@@ -1,8 +1,7 @@
 import numpy as np
 
-from partitioning import Partitioning
-from markowitz import Portfolio
-from recomposers import Recomposers
+from trash.partitioning import Partitioning
+
 np.random.seed(4)
 # Make console print look better
 np.set_printoptions(precision=4,  # Digits after point

@@ -1,8 +1,8 @@
 import numpy as np
 
-from partitioning import Partitioning
+from trash.partitioning import Partitioning
 from markowitz import Portfolio
-from recomposers import Recomposers
+from trash.recomposers import Recomposers
 
 
 def main():

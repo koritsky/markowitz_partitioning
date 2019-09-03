@@ -1,4 +1,3 @@
-from partitioning import Partitioning
 from markowitz import Portfolio
 import numpy as np
 
