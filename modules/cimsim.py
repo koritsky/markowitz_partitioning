@@ -25,7 +25,7 @@ class CIMSim:
         if self.dim > 0:
             self.calc_delta(-J * quadratic_coeff, -b)
             
-        self.default_params = {'c_th':1., 'zeta':1., 'init_coupling':0.3, 'final_coupling':1., 'N':1000, 'attempt_num':30000, 'dt':0.0001, 'sigma':100., 'alpha':0.9, 'S':1.5, 'D':-0.3, 'O':0.1}
+        self.default_params = {'c_th':1., 'zeta':1., 'init_coupling':0.3, 'final_coupling':1., 'N':1000, 'attempt_num':30000, 'dt':0.0001, 'sigma':0.5, 'alpha':0.9, 'S':1.5, 'D':-0.3, 'O':0.1}
         self.set_params(self.default_params)
 
     # init_value -- init coupling
@@ -77,10 +77,13 @@ class CIMSim:
         for i in range(np.shape(J)[0]-1):
             self.delta[i] = eigsortreverse[i] - eigsortreverse[i+1]
         
-    # amplitude increment
+    #amplitude increment
     def ampl_inc(self, c, zeta, p):
-        return (p*c + zeta*(torch.mm(self.J,c)+self.b))*self.dt + (self.sigma*(torch.FloatTensor(c.size(0), self.attempt_num).normal_().to(self.device)).type(torch.float64))*self.dt
-    
+        if self.device == "cuda": 
+            return (p*c + zeta*(torch.mm(self.J,c)+self.b))*self.dt + self.sigma*torch.cuda.DoubleTensor(c.size(0), self.attempt_num).normal_()
+        else:
+            return (p*c + zeta*(torch.mm(self.J,c)+self.b))*self.dt + (self.sigma*(torch.FloatTensor(c.size(0), self.attempt_num).normal_().to(self.device)).type(torch.float64))*self.dt
+
     def coupling(self):
         self.i = torch.arange(self.N).type(torch.float64).to(self.device)
         self.j = torch.arange(self.dim-1).type(torch.float64).to(self.device)
@@ -142,7 +145,7 @@ class CIMSim:
         random_attempt = np.random.randint(self.attempt_num)
 
         # initializing current amplitudes
-        c = torch.zeros((self.dim, self.attempt_num), dtype=torch.float64, device=self.device)
+        c = torch.zeros((self.dim, self.attempt_num),dtype=torch.float64, device=self.device)
         spins = torch.sign(c)
         dc = torch.zeros_like(c).to(self.device)
         
@@ -151,7 +154,7 @@ class CIMSim:
         c_evol[:,0] = c[:,random_attempt]
         # define pump array
         p = self.pump(Jmax).to(self.device)
-        H_opt = -0.5 * torch.einsum('ij,ik,jk->k', (self.J, spins, spins)) - torch.einsum('ij,ik->k', (self.b, spins)) + self.offset
+        H_opt = -0.5 * torch.einsum('ij,ik,jk->k',(self.J, spins, spins)) - torch.einsum('ij,ik->k',(self.b, spins)) + self.offset
         
         c_opt = c
         
@@ -194,7 +197,7 @@ class CIMSim:
             
         self.lastcuts = H_opt
         return c, c_evol, self.lastcuts, c_opt
-    
+ 
     def find_opt(self, callback = None):
         self.time_current = time.time() 
         c, c_evol, H_opt, c_opt = self.evolve(callback)
@@ -208,52 +211,3 @@ class CIMSim:
             
         energy_ising = H_opt.min()
         return (spins_ising, energy_ising, c, c_evol)
-
-
-class ising_utilits:
-    @staticmethod
-    def to_ising_file(h, J, filename):
-        """ Create an ising .txt file, that contains linear and quadratic coeffients as well as other (?) information
-
-        :param h: list of linear coefficients
-        :param J: matrix of quadratic coefficients
-        :param filename: name of file
-        """
-        n = len(h)
-        f = open(filename, 'w')
-        f.write("%f\n" % 3.0)
-        f.write("%f\n" % 0.1)
-        f.write("%f\n" % -0.9)
-        f.write("%f\n" % 0.07)
-        f.write("%d\n" % n)
-        for i in range(n):
-            if i in h.keys():
-                f.write("%f\n" % h[i])
-            else:
-                f.write("%f\n" % 0)
-        for row in range(n):
-            for col in range(row + 1, n):
-                if (row, col) in J.keys():
-                    f.write("%d %d %f\n" % (row + 1, col + 1, J[row, col]))
-                else:
-                    f.write("%d %d %f\n" % (row + 1, col + 1, 0))
-
-    @staticmethod
-    def ising_to_matrix(h, J):
-        """ Transfrom dictionaries into vector and matrix for ising task.
-
-        :param h: dict of linear coefficients
-        :param J: dict of quadratic coefficients
-        :return: tuple (hvector, Jmatrix) - vector of linear and matrix of quadratic coefficients
-        """
-        n = len(h)
-
-        hvector = np.zeros((n, 1))
-        for i in range(n):
-            if i in h.keys(): hvector[i] = h[i]
-
-        Jmatrix = np.zeros((n, n))
-        for row in range(n):
-            for col in range(row + 1, n):
-                if (row, col) in J.keys(): Jmatrix[row, col] = J[(row, col)]
-        return hvector, Jmatrix

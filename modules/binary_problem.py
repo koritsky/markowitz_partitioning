@@ -5,7 +5,7 @@ from hybrid.reference.kerberos import KerberosSampler
 import pyeasyga
 from modules.cplex_solver import CplexSolver
 from modules.cimsim import CIMSim
-from modules.cimsim import ising_utilits
+from modules.ising_utilits import ising_utilits
 
 
 class BinaryProblem:
