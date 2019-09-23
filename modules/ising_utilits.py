@@ -1,3 +1,5 @@
+import numpy as np
+
 class ising_utilits:
     @staticmethod
     def to_ising_file(h, J, filename):

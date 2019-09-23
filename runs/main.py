@@ -1,7 +1,7 @@
 import numpy as np
 
 from trash.partitioning import Partitioning
-from markowitz import Portfolio
+from modules.markowitz import Portfolio
 from trash.recomposers import Recomposers
 
 

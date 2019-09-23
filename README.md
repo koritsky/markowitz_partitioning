@@ -22,5 +22,5 @@ solve portfolio optimization and matrix partitioning problems accordingly.
 `Portfolio` build it's BQM from risk matrix, average and prices. `Partitioning` for similar
 purposes takes any square matrix (including risk matrix). Both use inherited method to solve 
 their BQMs.  
-For more specific information take a look into examples folder and comments to source code.
-
+For more details take a look into [examples](examples) files in general and [main example](examples/main_example.ipynb)
+ particularly. Also don't hesitate to explore comments to [source code](modules).

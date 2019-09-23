@@ -28,7 +28,8 @@ __all__ = ['Kerberos', 'KerberosSampler']
 def Kerberos(max_iter=100, max_time=None, convergence=3, energy_threshold=None,
              sa_reads=1, sa_sweeps=10000, tabu_timeout=500,
              qpu_reads=100, qpu_sampler=None, qpu_params=None,
-             max_subproblem_size=50, simcim=False):
+             max_subproblem_size=50, simcim=False,
+             tuner_timeout=30, simcim_attempt_num=1000):
     """An opinionated hybrid asynchronous decomposition sampler for problems of
     arbitrary structure and size. Runs Tabu search, Simulated annealing and QPU
     subproblem sampling (for high energy impact problem variables) in parallel
@@ -98,7 +99,8 @@ def Kerberos(max_iter=100, max_time=None, convergence=3, energy_threshold=None,
                                                                      qpu_sampler=qpu_sampler,
                                                                      qpu_params=qpu_params)
     else:
-        subproblem_solver = SimCIMSampler()
+        subproblem_solver = SimCIMSampler(tuner_timeout=tuner_timeout,
+                                          simcim_attempt_num=simcim_attempt_num)
 
     iteration = hybrid.Race(
         hybrid.Identity(),
