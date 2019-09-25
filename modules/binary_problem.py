@@ -4,17 +4,15 @@ import random
 from hybrid.reference.kerberos import KerberosSampler
 import pyeasyga
 from modules.cplex_solver import CplexSolver
-from modules.cimsim import CIMSim
-from modules.cimsim import ising_utilits
-
+from qboard.cimsim.cimsim import CIMSim
+from qboard.cimsim import tuner
+from modules.ising_utilits import ising_utilits
+import multiprocessing
+import qboard
+import qboard.cache
 
 class BinaryProblem:
-    # TODO: add assertions on empty bqm for all solvers:
-    # def qubo_check(self):
-    #     """ Check, whether qubo model was built.
-    #     """
-    #     if np.array_equal(self.portfolio_qubo, np.zeros((self.size, self.size))):
-    #         self.to_qubo()
+    # TODO: add assertions on empty bqm
 
     def __init__(self, bqm=None, qubo_mat=None):
         if bqm is None:
@@ -56,30 +54,59 @@ class BinaryProblem:
         self.current_solution = self.solution_energy(solution), solution
         return self.current_solution
 
-    def cplex_solver(self):
-        # Create binary quadratic model, that will find best permutation to return out mixed_matrix block structure
+    def cplex_solver(self, url=None, api_key=None):
+        if url == None:
+            url = "https://api-oaas.docloud.ibmcloud.com/job_manager/rest/v1/"
+        if api_key == None:
+            api_key = 'api_642ddfbf-ae49-4947-84f1-196f6883eab2'
         cplexsolver = CplexSolver(qubo_matrix=self.qubo_mat,
-                                  url="https://api-oaas.docloud.ibmcloud.com/job_manager/rest/v1/",
-                                  api_key='api_642ddfbf-ae49-4947-84f1-196f6883eab2')
+                                  url= url,
+                                  api_key=api_key)
         solution = cplexsolver.find_opt()
         self.current_solution = self.solution_energy(solution), solution
         return self.current_solution
 
-    def cim_solver(self, params: dict):
-        h, J, _ = self.bqm.to_ising()
-        hvector, Jmatrix = ising_utilits.ising_to_matrix(h, J)
+    def simcim_solver(self, tuner_timeout, attempt_num, no_energy = True):
+        h, J = ising_utilits.ising_to_matrix(self.bqm.linear, self.bqm.quadratic)
 
-        # Generate "ising file" for ParameterOptimizer
-        ising_utilits.to_ising_file(hvector, Jmatrix, "block_4_ising.txt")
+        # upload solutions
+        solutions = qboard.cache.Solutions()
 
-        # Run CIMSim
-        cimsim = CIMSim(Jmatrix, hvector, device="cpu")
-        cimsim.set_params(params = params)
-        (spins_ising, energy_ising, c_current, c_evol) = cimsim.find_opt()
+        "turn this on if you want not to run simcim if this qubo was already solved"
+        # if (h, J) in solutions:
+        #     spins_ising = [1 if _ else -1 for _ in solutions[h, J]]
+        #     energy_ising = qubo.ienergy(h, J, spins_ising)
+        # else:
 
-        # Print solution as permutation matrix
-        solution = np.array([int((i + 1) / 2) for i in spins_ising])
-        self.current_solution = self.solution_energy(solution), solution
+        # run parameter tuner for no longer than "timeout" seconds
+        params = qboard.cache.Parameters()
+
+        def optimizer(h, J):
+            params[h, J] = tuner.optimize(h, J)
+
+        p = multiprocessing.Process(target=optimizer, name="Optimizer", args=(h, J))
+        p.start()
+        p.join(tuner_timeout)
+        if p.is_alive():
+            p.terminate()
+            p.join()
+
+        # run "simcim_attempt_num" iterations of cimsim
+        cimsim = CIMSim(J, h.reshape(-1, 1), device='cpu')
+        cimsim.set_params({'c_th': 1.,
+                           'zeta': 1.,
+                           'init_coupling': 0.3,
+                           'final_coupling': 1.,
+                           'N': 1000,
+                           'attempt_num': attempt_num,
+                           **params[h, J]})
+        spins_ising, energy_ising, c_current, c_evol = cimsim.find_opt()
+        solutions[h, J] = spins_ising
+        solution = np.array([int((spins_ising[i] + 1) / 2) for i in range(len(spins_ising))])
+        try:
+            self.current_solution = self.solution_energy(solution), solution
+        except IndexError:
+            self.current_solution = np.NaN, solution
         return self.current_solution
 
     def kerberos_solver(self, **kwargs):
@@ -191,34 +218,3 @@ class BinaryProblem:
         solution = best_result[1]
         self.current_solution = self.solution_energy(solution), solution
         return self.current_solution
-
-    # I don't think we need qbsolv. Kerberos deals with it in more general way
-
-    # def qbsolv(self, fraction=0.1, num_repeats=50, quantum_solver=False):
-    #     """ Solves using qbsolv https://readthedocs.com/projects/d-wave-systems-qbsolv/downloads/pdf/latest/
-    #     :param fraction:
-    #     :param num_repeats:
-    #     :param quantum_solver:
-    #     :return: tuple (energy, solution)
-    #     """
-    #     subgraph_size = int(self.size * fraction)
-    #     # find embedding of subproblem-sized complete graph to the QPU
-    #     if quantum_solver is True:
-    #         G = nx.complete_graph(subgraph_size)
-    #         system = DWaveSampler()
-    #         embedding = minorminer.find_embedding(G.edges, system.edgelist)
-    #         solver = FixedEmbeddingComposite(system, embedding)
-    #     else:
-    #         solver = 'tabu'
-    #
-    #     # solve a random problem
-    #     response = QBSolv().sample_qubo(self.Q,
-    #                                     solver=solver,
-    #                                     solver_limit=subgraph_size,
-    #                                     num_repeats=num_repeats,
-    #                                     timeout=30)
-    #     best_result = response.data_vectors['energy'], []
-    #     for i in range(self.size):
-    #         best_result[1].append(int((response.samples()[0][i] + 1) / 2))
-    #     self.current_solution = best_result
-    #     return self.current_solution

@@ -1,0 +1,3 @@
+[submodule "quantum-markowitz"]
+	path = quantum-markowitz
+	url = https://gitlab.qapp.tech/qapp/quantum-markowitz
