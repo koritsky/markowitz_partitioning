@@ -24,3 +24,4 @@ purposes takes any square matrix (including risk matrix). Both use inherited met
 their BQMs.  
 For more details take a look into [examples](examples) files in general and [main example](examples/main_example.ipynb)
  particularly. Also don't hesitate to explore comments to [source code](modules).
+

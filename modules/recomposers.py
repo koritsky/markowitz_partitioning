@@ -5,7 +5,7 @@ import numpy as np
 class Recomposers:
 
     @staticmethod
-    def permutation_decomposer(portfolio, permutation_mat, max_dim: int, theta = None):
+    def permutation_decomposer(portfolio, permutation_mat, max_dim: int, theta=None):
         if theta is None:
             theta = portfolio.theta
         mixed_mat = portfolio.covariance

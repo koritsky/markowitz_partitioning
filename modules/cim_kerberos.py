@@ -238,7 +238,6 @@ class KerberosSampler(dimod.Sampler):
         samples = []
         energies = []
         for i in range(num_reads):
-            print(f"Begin of {i}th iteration")
             init_state = init_state_gen()
 
             # The next line is responsible for getting state from one iteration of branch computation.
@@ -249,6 +248,5 @@ class KerberosSampler(dimod.Sampler):
             ss.change_vartype(bqm.vartype, inplace=True)
             samples.append(ss.first.sample)
             energies.append(ss.first.energy)
-            print(f"End of {i}th iteration")
 
         return dimod.SampleSet.from_samples(samples, vartype=bqm.vartype, energy=energies)
